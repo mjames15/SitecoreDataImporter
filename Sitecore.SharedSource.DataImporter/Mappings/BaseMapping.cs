@@ -52,6 +52,22 @@ namespace Sitecore.SharedSource.DataImporter.Mappings {
 			}
 		}
 
+        private bool _overwriteValue;
+        /// <summary>
+        /// the field on the new item that the imported data should be stored in
+        /// </summary>
+        public bool OverwriteValue
+        {
+            get
+            {
+                return _overwriteValue;
+            }
+            set
+            {
+                _overwriteValue = value;
+            }
+        }
+
 		#endregion Properties
 
 		#region Constructor
@@ -60,6 +76,7 @@ namespace Sitecore.SharedSource.DataImporter.Mappings {
 			NewItemField = i.Fields["To What Field"].Value;
 			HandlerClass = i.Fields["Handler Class"].Value;
 			HandlerAssembly = i.Fields["Handler Assembly"].Value;
+		    OverwriteValue = ((Sitecore.Data.Fields.CheckboxField) i.Fields["Overwrite"]).Checked;
 		}
 
 		#endregion Constructor

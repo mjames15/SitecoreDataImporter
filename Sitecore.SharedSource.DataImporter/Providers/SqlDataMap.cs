@@ -22,7 +22,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
 
 		#region Constructor
 
-		public SqlDataMap(Database db, string connectionString, Item importItem) : base (db, connectionString, importItem) {
+		public SqlDataMap(Database db, string connectionString, Item importItem, string lastUpdated = "") : base (db, connectionString, importItem, lastUpdated) {
 		}
 		
 		#endregion Constructor
@@ -39,6 +39,12 @@ namespace Sitecore.SharedSource.DataImporter.Providers
             SqlConnection dbCon = new SqlConnection(this.DatabaseConnectionString);
             dbCon.Open();
 
+            if (DeltasOnly)
+            {
+                Query = string.Format("{0} WHERE {1} > '{2}'", this.Query, LastUpdatedFieldName,
+                    LastUpdated.ToString("d"));
+            }
+
             SqlDataAdapter adapter = new SqlDataAdapter(this.Query, dbCon);
             adapter.Fill(ds);
             dbCon.Close();
@@ -49,7 +55,34 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                     select dr).Cast<object>();
         }
 
-        /// <summary>
+        public override IEnumerable<object> SyncDeletions()
+        {
+            DataSet ds = new DataSet();
+            SqlConnection dbCon = new SqlConnection(this.DatabaseConnectionString);
+            dbCon.Open();
+
+            SqlDataAdapter adapter = new SqlDataAdapter(this.MissingItemsQuery, dbCon);
+            adapter.Fill(ds);
+            dbCon.Close();
+
+            DataTable dt = ds.Tables[0].Copy();
+
+            return (from DataRow dr in dt.Rows
+                    select dr).Cast<object>();
+        }
+
+	    public override void TakeHistorySnapshot()
+	    {
+            DataSet ds = new DataSet();
+            SqlConnection dbCon = new SqlConnection(this.DatabaseConnectionString);
+            dbCon.Open();
+
+            SqlDataAdapter adapter = new SqlDataAdapter(this.HistorySnapshotQuery, dbCon);
+            adapter.Fill(ds);
+            dbCon.Close();
+	    }
+
+	    /// <summary>
         /// doesn't handle any custom data
         /// </summary>
         /// <param name="newItem"></param>

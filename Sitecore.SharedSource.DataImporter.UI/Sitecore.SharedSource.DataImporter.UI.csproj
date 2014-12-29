@@ -31,7 +31,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="Sitecore.Kernel">
-      <HintPath>..\..\..\Website\bin\Sitecore.Kernel.dll</HintPath>
+      <HintPath>..\_references\Sitecore.Kernel.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System" />
@@ -73,8 +73,8 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(ProjectDir)\packages\DataImporter-package.zip" "$(SolutionDir)\data\packages\DataImporter-package.zip"
-start xcopy /S /Y "$(ProjectDir)\sitecore modules\Editors\*" "$(SolutionDir)\sitecore modules\shell\Data Import\"</PostBuildEvent>
+    <PostBuildEvent>REM copy /Y "$(ProjectDir)\packages\DataImporter-package.zip" "$(SolutionDir)\data\packages\DataImporter-package.zip"
+REM start xcopy /S /Y "$(ProjectDir)\sitecore modules\Editors\*" "$(SolutionDir)\sitecore modules\shell\Data Import\"</PostBuildEvent>
   </PropertyGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

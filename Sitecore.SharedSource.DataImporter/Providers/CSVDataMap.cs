@@ -85,8 +85,18 @@ namespace Sitecore.SharedSource.DataImporter.Providers {
 			
 			return lines;
         }
-		
-		/// <summary>
+
+	    public override IEnumerable<object> SyncDeletions()
+	    {
+	        throw new NotImplementedException();
+	    }
+
+	    public override void TakeHistorySnapshot()
+	    {
+	        throw new NotImplementedException();
+	    }
+
+	    /// <summary>
 		/// There is no custom data for this type
 		/// </summary>
 		/// <param name="newItem"></param>

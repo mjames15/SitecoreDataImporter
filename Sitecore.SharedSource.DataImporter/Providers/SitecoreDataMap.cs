@@ -183,7 +183,17 @@ namespace Sitecore.SharedSource.DataImporter.Providers
 			return FromDB.SelectItems(StringUtility.CleanXPath(this.Query));
         }
 
-        /// <summary>
+	    public override IEnumerable<object> SyncDeletions()
+	    {
+	        throw new NotImplementedException();
+	    }
+
+	    public override void TakeHistorySnapshot()
+	    {
+	        throw new NotImplementedException();
+	    }
+
+	    /// <summary>
         /// deals with the sitecore properties
         /// </summary>
         /// <param name="newItem"></param>

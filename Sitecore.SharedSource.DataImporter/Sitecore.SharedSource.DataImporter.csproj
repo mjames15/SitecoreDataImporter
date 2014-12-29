@@ -55,10 +55,19 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="MySql.Data">
-      <HintPath>..\..\Sitecore\bin\MySql.Data.dll</HintPath>
+      <HintPath>..\_references\MySql.Data.dll</HintPath>
+    </Reference>
+    <Reference Include="Sitecore.ContentSearch">
+      <HintPath>..\_references\Sitecore.ContentSearch.dll</HintPath>
+    </Reference>
+    <Reference Include="Sitecore.ContentSearch.Linq">
+      <HintPath>..\_references\Sitecore.ContentSearch.Linq.dll</HintPath>
+    </Reference>
+    <Reference Include="Sitecore.ContentSearch.Linq.Lucene">
+      <HintPath>..\_references\Sitecore.ContentSearch.Linq.Lucene.dll</HintPath>
     </Reference>
     <Reference Include="Sitecore.Kernel">
-      <HintPath>..\..\Sitecore\bin\Sitecore.Kernel.dll</HintPath>
+      <HintPath>..\_references\Sitecore.Kernel.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.configuration" />

@@ -68,8 +68,13 @@ namespace Sitecore.SharedSource.DataImporter.Mappings.Fields
 		public virtual void FillField(BaseDataMap map, ref Item newItem, string importValue) {
             //store the imported value as is
             Field f = newItem.Fields[NewItemField];
-            if(f != null)
-                f.Value = importValue;
+		    if (f != null)
+		    {
+		        if (string.IsNullOrEmpty(f.Value) || this.OverwriteValue)
+		        {
+		            f.Value = importValue.Trim();
+		        }
+		    }
 		}
 
         #endregion Methods
