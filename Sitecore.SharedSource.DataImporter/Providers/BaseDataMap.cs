@@ -417,6 +417,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         {
             IEnumerable<object> importItems;
             var removedItems = Enumerable.Empty<object>();
+            Sitecore.Configuration.Settings.Indexing.Enabled = false;
             try
             {
                 importItems = GetImportData();
@@ -478,6 +479,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                     Log("SyncDeletions Error (line: " + line + ")", ex.Message);
                 }
             }
+            Sitecore.Configuration.Settings.Indexing.Enabled = true;
 
             if (!string.IsNullOrEmpty(this.HistorySnapshotQuery))
             {
