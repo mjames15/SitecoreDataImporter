@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Sitecore.ContentSearch;
+using Sitecore.ContentSearch.Maintenance;
 using Sitecore.ContentSearch.SearchTypes;
 using Sitecore.Data;
 using Sitecore.Data.Fields;
@@ -11,7 +12,6 @@ using Sitecore.Data.Items;
 using Sitecore.Data.Managers;
 using Sitecore.Globalization;
 using Sitecore.Reflection;
-using Sitecore.Rules.Conditions.DateTimeConditions;
 using Sitecore.SharedSource.DataImporter.Extensions;
 using Sitecore.SharedSource.DataImporter.Mappings;
 using Sitecore.SharedSource.DataImporter.Mappings.Fields;
@@ -29,14 +29,24 @@ namespace Sitecore.SharedSource.DataImporter.Providers
 
         public BaseDataMap(Database db, string connectionString, Item importItem, string lastUpdated = "")
         {
-            Overwrite = importItem.Fields["Overwrite Item"] != null && ((CheckboxField)importItem.Fields["Overwrite Item"]).Checked;
+            Overwrite = importItem.Fields["Overwrite Item"] != null &&
+                        ((CheckboxField) importItem.Fields["Overwrite Item"]).Checked;
+            SkipExistingItems = importItem.Fields["Skip Existing Items"] != null &&
+                                ((CheckboxField) importItem.Fields["Skip Existing Items"]).Checked;
             SearchIndex = importItem.Fields["Search Index"] != null ? importItem.Fields["Search Index"].Value : "";
-            DeltasOnly = importItem.Fields["Deltas Only"] != null && ((CheckboxField)importItem.Fields["Deltas Only"]).Checked;
-            LastUpdatedFieldName = importItem.Fields["Last Updated Field Name"] != null ? importItem.Fields["Last Updated Field Name"].Value : "";
+            DeltasOnly = importItem.Fields["Deltas Only"] != null &&
+                         ((CheckboxField) importItem.Fields["Deltas Only"]).Checked;
+            LastUpdatedFieldName = importItem.Fields["Last Updated Field Name"] != null
+                ? importItem.Fields["Last Updated Field Name"].Value
+                : "";
             LastUpdated = string.IsNullOrEmpty(lastUpdated) ? DateTime.Now.AddDays(-30) : DateTime.Parse(lastUpdated);
-            MissingItemsQuery = importItem.Fields["Missing Items Query"] != null ? importItem.Fields["Missing Items Query"].Value : "";
-            HistorySnapshotQuery = importItem.Fields["History Snapshot Query"] != null ? importItem.Fields["History Snapshot Query"].Value : "";
-            
+            MissingItemsQuery = importItem.Fields["Missing Items Query"] != null
+                ? importItem.Fields["Missing Items Query"].Value
+                : "";
+            HistorySnapshotQuery = importItem.Fields["History Snapshot Query"] != null
+                ? importItem.Fields["History Snapshot Query"].Value
+                : "";
+
             //instantiate log
             log = new StringBuilder();
 
@@ -280,6 +290,11 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         /// </summary>
         public bool Overwrite { get; set; }
 
+        /// <summary>
+        ///     Whether or not the system should skip over items that already are in Sitecore
+        /// </summary>
+        public bool SkipExistingItems { get; set; }
+
         public string SearchIndex { get; set; }
 
         public bool DeltasOnly { get; set; }
@@ -304,7 +319,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
 
         public abstract IEnumerable<object> SyncDeletions();
 
-        public abstract void TakeHistorySnapshot(); 
+        public abstract void TakeHistorySnapshot();
 
         /// <summary>
         ///     this is used to process custom fields or properties
@@ -417,75 +432,72 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         {
             IEnumerable<object> importItems;
             var removedItems = Enumerable.Empty<object>();
-            Sitecore.Configuration.Settings.Indexing.Enabled = false;
-            using (new Sitecore.Data.DatabaseCacheDisabler())
+            IndexCustodian.PauseIndexing();
+            try
+            {
+                importItems = GetImportData();
+            }
+            catch (Exception ex)
+            {
+                importItems = Enumerable.Empty<object>();
+                Log("Connection Error", ex.Message);
+            }
+
+            long line = 0;
+
+            try
+            {
+                //Loop through the data source
+                foreach (var importRow in importItems)
+                {
+                    line++;
+
+                    var newItemName = GetNewItemName(importRow);
+                    if (string.IsNullOrEmpty(newItemName))
+                        continue;
+
+                    var thisParent = GetParentNode(importRow, newItemName);
+                    if (thisParent.IsNull())
+                        throw new NullReferenceException("The new item's parent is null");
+
+                    CreateNewItem(thisParent, importRow, newItemName);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log("Error (line: " + line + ")", ex.Message);
+            }
+
+            if (!string.IsNullOrEmpty(MissingItemsQuery))
             {
                 try
                 {
-                    importItems = GetImportData();
-                }
-                catch (Exception ex)
-                {
-                    importItems = Enumerable.Empty<object>();
-                    Log("Connection Error", ex.Message);
-                }
-
-                long line = 0;
-
-                try
-                {
+                    removedItems = SyncDeletions();
+                    line = 0;
                     //Loop through the data source
-                    foreach (var importRow in importItems)
+                    foreach (var removeRow in removedItems)
                     {
                         line++;
-
-                        var newItemName = GetNewItemName(importRow);
-                        if (string.IsNullOrEmpty(newItemName))
+                        var itemName = GetNewItemName(removeRow);
+                        if (string.IsNullOrEmpty(itemName))
                             continue;
 
-                        var thisParent = GetParentNode(importRow, newItemName);
+                        var thisParent = GetParentNode(removeRow, itemName);
                         if (thisParent.IsNull())
                             throw new NullReferenceException("The new item's parent is null");
 
-                        CreateNewItem(thisParent, importRow, newItemName);
+                        RemoveItem(thisParent, removeRow, itemName);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log("Error (line: " + line + ")", ex.Message);
-                }
-
-                if (!string.IsNullOrEmpty(this.MissingItemsQuery))
-                {
-                    try
-                    {
-                        removedItems = SyncDeletions();
-                        line = 0;
-                        //Loop through the data source
-                        foreach (var removeRow in removedItems)
-                        {
-                            line++;
-                            var itemName = GetNewItemName(removeRow);
-                            if (string.IsNullOrEmpty(itemName))
-                                continue;
-
-                            var thisParent = GetParentNode(removeRow, itemName);
-                            if (thisParent.IsNull())
-                                throw new NullReferenceException("The new item's parent is null");
-
-                            RemoveItem(thisParent, removeRow, itemName);
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log("SyncDeletions Error (line: " + line + ")", ex.Message);
-                    }
+                    Log("SyncDeletions Error (line: " + line + ")", ex.Message);
                 }
             }
-            Sitecore.Configuration.Settings.Indexing.Enabled = true;
+            IndexCustodian.ResumeIndexing();
 
             var lineNumber = 0;
-            if (!string.IsNullOrEmpty(this.HistorySnapshotQuery))
+            if (!string.IsNullOrEmpty(HistorySnapshotQuery))
             {
                 try
                 {
@@ -534,10 +546,10 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                 }
                 if (newItem != null)
                 {
+                    if (SkipExistingItems)
+                        return;
                     if (!Overwrite)
-                    {
                         newItem = newItem.Versions.AddVersion();
-                    }
                 }
 
                 //if not found then create one
