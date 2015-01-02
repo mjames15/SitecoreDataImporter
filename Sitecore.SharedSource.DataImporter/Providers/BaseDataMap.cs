@@ -529,7 +529,21 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                 //search for the child by name
                 if (string.IsNullOrEmpty(SearchIndex))
                 {
-                    newItem = parent.Axes.GetDescendants().FirstOrDefault(x => x.Name == newItemName);
+                    var existingItems = parent.Axes.GetDescendants().Where(x => x.Name == newItemName);
+                    var firstItem = true;
+                    foreach (var existingItem in existingItems)
+                    {
+                        if (firstItem)
+                        {
+                            newItem = existingItem;
+                        }
+                        else
+                        {
+                            existingItem.Delete();
+                        }
+
+                        firstItem = false;
+                    }
                 }
                 else
                 {
@@ -541,6 +555,20 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                         if (query.Any())
                         {
                             newItem = SitecoreDB.GetItem(query.First().ItemId);
+                        }
+                        var firstItem = true;
+                        foreach (var existingItem in query)
+                        {
+                            if (firstItem)
+                            {
+                                newItem = SitecoreDB.GetItem(existingItem.ItemId);
+                            }
+                            else
+                            {
+                                var duplicateItem = SitecoreDB.GetItem(existingItem.ItemId);
+                                duplicateItem.Delete();
+                            }
+                            firstItem = false;
                         }
                     }
                 }
