@@ -566,7 +566,10 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                             else
                             {
                                 var duplicateItem = SitecoreDB.GetItem(existingItem.ItemId);
-                                duplicateItem.Delete();
+                                if (duplicateItem != null)
+                                {
+                                    duplicateItem.Delete();
+                                }
                             }
                             firstItem = false;
                         }
