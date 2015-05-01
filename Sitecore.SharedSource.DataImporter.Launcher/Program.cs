@@ -82,12 +82,17 @@ namespace Sitecore.SharedSource.DataImporter.Launcher {
 				Console.WriteLine("The import definition item ID you specified returned a null item");
 				Environment.Exit((int)ExitCode.NullImportItem);
 			}
-
-			using (new SecurityDisabler()) {
-				BaseDataMap map = (BaseDataMap)Sitecore.Reflection.ReflectionUtil.CreateObject(assemblyName, className, new object[] { scDB, connStr, importDefItem });
+            using (new Sitecore.SecurityModel.SecurityDisabler())
+            using (new Sitecore.Data.Proxies.ProxyDisabler())
+            using (new Sitecore.Data.DatabaseCacheDisabler())
+            using (new Sitecore.Data.BulkUpdateContext())
+            {
+                Sitecore.Configuration.Settings.Indexing.Enabled = false;
+                BaseDataMap map = (BaseDataMap)Sitecore.Reflection.ReflectionUtil.CreateObject(assemblyName, className, new object[] { scDB, connStr, importDefItem });
 				string message = map.Process();
 				Console.WriteLine(message);
-			}
+                Sitecore.Configuration.Settings.Indexing.Enabled = true;
+            }
 		}
 
 		protected static string GetArg(string[] args, string argName) {

@@ -430,90 +430,105 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         /// </summary>
         public string Process()
         {
-            IEnumerable<object> importItems;
-            var removedItems = Enumerable.Empty<object>();
-            IndexCustodian.PauseIndexing();
-            try
+            using (new Sitecore.Data.BulkUpdateContext())
             {
-                importItems = GetImportData();
-            }
-            catch (Exception ex)
-            {
-                importItems = Enumerable.Empty<object>();
-                Log("Connection Error", ex.Message);
-            }
+                Sitecore.Configuration.Settings.Indexing.Enabled = false;
 
-            long line = 0;
+                #region process
 
-            try
-            {
-                //Loop through the data source
-                foreach (var importRow in importItems)
-                {
-                    line++;
-
-                    var newItemName = GetNewItemName(importRow);
-                    if (string.IsNullOrEmpty(newItemName))
-                        continue;
-
-                    var thisParent = GetParentNode(importRow, newItemName);
-                    if (thisParent.IsNull())
-                        throw new NullReferenceException("The new item's parent is null");
-
-                    CreateNewItem(thisParent, importRow, newItemName);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log("Error (line: " + line + ")", ex.Message);
-            }
-
-            if (!string.IsNullOrEmpty(MissingItemsQuery))
-            {
+                IEnumerable<object> importItems;
+                var removedItems = Enumerable.Empty<object>();
+                IndexCustodian.PauseIndexing();
                 try
                 {
-                    removedItems = SyncDeletions();
-                    line = 0;
+                    importItems = GetImportData();
+                }
+                catch (Exception ex)
+                {
+                    importItems = Enumerable.Empty<object>();
+                    Log("Connection Error", ex.Message);
+                }
+
+                long line = 0;
+
+                try
+                {
                     //Loop through the data source
-                    foreach (var removeRow in removedItems)
+                    foreach (var importRow in importItems)
                     {
                         line++;
-                        var itemName = GetNewItemName(removeRow);
-                        if (string.IsNullOrEmpty(itemName))
+
+                        var newItemName = GetNewItemName(importRow);
+                        if (string.IsNullOrEmpty(newItemName))
                             continue;
 
-                        var thisParent = GetParentNode(removeRow, itemName);
+                        var thisParent = GetParentNode(importRow, newItemName);
                         if (thisParent.IsNull())
                             throw new NullReferenceException("The new item's parent is null");
 
-                        RemoveItem(thisParent, removeRow, itemName);
+                        CreateNewItem(thisParent, importRow, newItemName);
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log("SyncDeletions Error (line: " + line + ")", ex.Message);
+                    Log("Error (line: " + line + ")", ex.Message);
                 }
-            }
-            IndexCustodian.ResumeIndexing();
 
-            var lineNumber = 0;
-            if (!string.IsNullOrEmpty(HistorySnapshotQuery))
-            {
-                try
+                if (!string.IsNullOrEmpty(MissingItemsQuery))
                 {
-                    TakeHistorySnapshot();
+                    try
+                    {
+                        removedItems = SyncDeletions();
+                        line = 0;
+                        //Loop through the data source
+                        foreach (var removeRow in removedItems)
+                        {
+                            line++;
+                            var itemName = GetNewItemName(removeRow);
+                            if (string.IsNullOrEmpty(itemName))
+                                continue;
+
+                            var thisParent = GetParentNode(removeRow, itemName);
+                            if (thisParent.IsNull())
+                            {
+                                throw new NullReferenceException("The new item's parent is null");
+                            }
+
+                            RemoveItem(thisParent, removeRow, itemName);
+                            Log("Removed Missing Item", itemName + " was removed from Sitecore");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("SyncDeletions Error (line: " + line + ")", ex.Message);
+                    }
                 }
-                catch (Exception ex)
+                IndexCustodian.ResumeIndexing();
+
+                var lineNumber = 0;
+                if (!string.IsNullOrEmpty(HistorySnapshotQuery))
                 {
-                    Log("TakeHistorySnapshot Error (line: " + lineNumber + ")", ex.Message);
+                    try
+                    {
+                        TakeHistorySnapshot();
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("TakeHistorySnapshot Error (line: " + lineNumber + ")", ex.Message);
+                    }
                 }
+
+                //if no messages then you're good
+                if (log.Length < 1 || !log.ToString().Contains("Error"))
+                    Log("Success", "the import completed successfully");
+
+                return log.ToString();
+
+                #endregion
+
+                Sitecore.Configuration.Settings.Indexing.Enabled = true;
+
             }
-
-            //if no messages then you're good
-            if (log.Length < 1 || !log.ToString().Contains("Error"))
-                Log("Success", "the import completed successfully");
-
-            return log.ToString();
         }
 
         public void CreateNewItem(Item parent, object importRow, string newItemName)
@@ -540,6 +555,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                         else
                         {
                             existingItem.Delete();
+                            Log("Duplicate Item Found", "Deleting Duplicate Item (matNum: " + existingItem.Name + ")");
                         }
 
                         firstItem = false;
@@ -569,6 +585,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                                 if (duplicateItem != null)
                                 {
                                     duplicateItem.Delete();
+                                    Log("Duplicate Item Found", "Deleting Duplicate Item (matNum: " + existingItem.Name + ")");
                                 }
                             }
                             firstItem = false;
@@ -593,8 +610,10 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                 }
 
                 if (newItem == null)
+                {
+                    Log("Null Item", "the new item created was null)");
                     throw new NullReferenceException("the new item created was null");
-
+                }
                 using (new EditContext(newItem, true, false))
                 {
                     //add in the field mappings
