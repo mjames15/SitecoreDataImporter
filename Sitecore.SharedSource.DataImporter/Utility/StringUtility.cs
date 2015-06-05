@@ -61,7 +61,8 @@ namespace Sitecore.SharedSource.DataImporter.Utility
         public static string TrimText(string val, int maxLength, string endingString)
         {
             string strRetVal = val;
-            return (val.Length > maxLength) ? val.Substring(0, maxLength) + endingString : strRetVal;
+            var trimedText = (val.Length > maxLength) ? val.Substring(0, maxLength) + endingString : strRetVal;
+            return trimedText.Trim();
         }
 
         public static string StripInvalidChars(string val)
