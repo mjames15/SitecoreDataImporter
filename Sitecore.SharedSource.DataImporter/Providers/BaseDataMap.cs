@@ -430,6 +430,9 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         /// </summary>
         public string Process()
         {
+            using (new Sitecore.SecurityModel.SecurityDisabler())
+            using (new Sitecore.Data.Proxies.ProxyDisabler())
+            using (new Sitecore.Data.DatabaseCacheDisabler())
             using (new Sitecore.Data.BulkUpdateContext())
             {
                 Sitecore.Configuration.Settings.Indexing.Enabled = false;
