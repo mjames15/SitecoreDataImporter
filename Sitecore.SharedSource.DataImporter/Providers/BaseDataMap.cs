@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net.Mail;
 using System.Text;
 using Sitecore.ContentSearch;
 using Sitecore.ContentSearch.Maintenance;
@@ -46,6 +47,10 @@ namespace Sitecore.SharedSource.DataImporter.Providers
             HistorySnapshotQuery = importItem.Fields["History Snapshot Query"] != null
                 ? importItem.Fields["History Snapshot Query"].Value
                 : "";
+            NotificationAddressList = importItem.Fields["Notification Addresses"]?.Value.Split(',').ToList() ?? new List<string>();
+
+            SendEmail = importItem.Fields["Notification Email"] != null &&
+                        ((CheckboxField)importItem.Fields["Notification Email"]).Checked;
 
             //instantiate log
             log = new StringBuilder();
@@ -295,6 +300,8 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         /// </summary>
         public bool SkipExistingItems { get; set; }
 
+        public bool SendEmail { get; set; }
+
         public string SearchIndex { get; set; }
 
         public bool DeltasOnly { get; set; }
@@ -306,6 +313,8 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         public string MissingItemsQuery { get; set; }
 
         public string HistorySnapshotQuery { get; set; }
+
+        public List<string> NotificationAddressList { get; set; }
 
         #endregion Properties
 
@@ -431,17 +440,12 @@ namespace Sitecore.SharedSource.DataImporter.Providers
         public string Process()
         {
             using (new Sitecore.SecurityModel.SecurityDisabler())
-            using (new Sitecore.Data.Proxies.ProxyDisabler())
-            using (new Sitecore.Data.DatabaseCacheDisabler())
-            using (new Sitecore.Data.BulkUpdateContext())
             {
-                Sitecore.Configuration.Settings.Indexing.Enabled = false;
 
                 #region process
 
                 IEnumerable<object> importItems;
                 var removedItems = Enumerable.Empty<object>();
-                IndexCustodian.PauseIndexing();
                 try
                 {
                     importItems = GetImportData();
@@ -498,7 +502,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                             }
 
                             RemoveItem(thisParent, removeRow, itemName);
-                            Log("Removed Missing Item", itemName + " was removed from Sitecore");
+                            Log("Removed Item", itemName + " was removed from Sitecore");
                         }
                     }
                     catch (Exception ex)
@@ -506,7 +510,6 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                         Log("SyncDeletions Error (line: " + line + ")", ex.Message);
                     }
                 }
-                IndexCustodian.ResumeIndexing();
 
                 var lineNumber = 0;
                 if (!string.IsNullOrEmpty(HistorySnapshotQuery))
@@ -525,11 +528,29 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                 if (log.Length < 1 || !log.ToString().Contains("Error"))
                     Log("Success", "the import completed successfully");
 
+                if (SendEmail)
+                {
+
+                    var mail = new MailMessage {From = new MailAddress("sitecore@meau.com")};
+                    foreach (var emailAddress in NotificationAddressList)
+                    {
+                        mail.To.Add(emailAddress);
+                    }
+                    mail.Subject = "Updated Portal Materials";
+                    mail.Body = log.ToString();
+                    try
+                    {
+                        MainUtil.SendMail(mail);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log("Error Sending Email", ex.Message);
+                    }
+                }
                 return log.ToString();
 
                 #endregion
 
-                Sitecore.Configuration.Settings.Indexing.Enabled = true;
 
             }
         }
@@ -570,30 +591,12 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                     using (var context = index.CreateSearchContext())
                     {
                         var query =
-                            context.GetQueryable<SearchResultItem>().Where(m => m.Name == newItemName);
-                        if (query.Any())
+                            context.GetQueryable<SearchResultItem>().Where(m => m.Name.Equals(newItemName)).FirstOrDefault(f => f.Name.Equals(newItemName));
+                        if (query != null)
                         {
-                            newItem = SitecoreDB.GetItem(query.First().ItemId);
+                            newItem = SitecoreDB.GetItem(query.ItemId);
                         }
-                        var firstItem = true;
-                        foreach (var existingItem in query)
-                        {
-                            if (firstItem)
-                            {
-                                newItem = SitecoreDB.GetItem(existingItem.ItemId);
-                            }
-                            else
-                            {
-                                var duplicateItem = SitecoreDB.GetItem(existingItem.ItemId);
-                                if (duplicateItem != null)
-                                {
-                                    duplicateItem.Delete();
-                                    Log("Duplicate Item Found", "Deleting Duplicate Item (matNum: " + existingItem.Name + ")");
-                                }
-                            }
-                            firstItem = false;
-                        }
-                    }
+                   }
                 }
                 if (newItem != null)
                 {
@@ -631,7 +634,7 @@ namespace Sitecore.SharedSource.DataImporter.Providers
                     //calls the subclass method to handle custom fields and properties
                     ProcessCustomData(ref newItem, importRow);
 
-                    Log("INFO", string.Format("{0} Material {1}", newItem.DisplayName, updating ? "Updated" : "Added"));
+                    Log("INFO", $"{newItem.Fields["MaterialNumber"].Value} Material {(updating ? "Updated" : "Added")}");
                 }
             }
         }

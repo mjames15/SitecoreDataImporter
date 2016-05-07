@@ -11,6 +11,7 @@ using System.Collections;
 using Sitecore.SharedSource.DataImporter.Providers;
 using Sitecore.SharedSource.DataImporter.Utility;
 using Sitecore.Data.Fields;
+using Sitecore.SecurityModel;
 
 namespace Sitecore.SharedSource.DataImporter.Mappings.Fields {
 	
@@ -67,8 +68,19 @@ namespace Sitecore.SharedSource.DataImporter.Mappings.Fields {
                 if (t.Any()) {
                     Field f = newItem.Fields[NewItemField];
                     if(f != null)
-                        f.Value = t.First().ID.ToString();
-                }
+                        try
+                        {
+                            using (new SecurityDisabler())
+                            {
+                                newItem.Editing.BeginEdit();
+                                f.Value = t.First().ID.ToString();
+                                newItem.Editing.EndEdit();
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                        }
+                             }
 			}
 		}
 

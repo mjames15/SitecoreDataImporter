@@ -8,6 +8,7 @@ using System.Web;
 using Sitecore.Data.Fields;
 using System.Data;
 using System.Collections;
+using Sitecore.SecurityModel;
 using Sitecore.SharedSource.DataImporter.Providers;
 
 namespace Sitecore.SharedSource.DataImporter.Mappings.Fields
@@ -72,7 +73,19 @@ namespace Sitecore.SharedSource.DataImporter.Mappings.Fields
 		    {
 		        if (string.IsNullOrEmpty(f.Value) || this.OverwriteValue)
 		        {
-		            f.Value = importValue.Trim();
+                    try
+                    {
+                        using (new SecurityDisabler())
+                        {
+                            newItem.Editing.BeginEdit();
+                            f.Value = importValue.Trim();
+                            newItem.Editing.EndEdit();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                    }
+                   
 		        }
 		    }
 		}

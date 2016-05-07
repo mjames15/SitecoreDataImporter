@@ -39,13 +39,15 @@ namespace Sitecore.SharedSource.DataImporter.Providers
             SqlConnection dbCon = new SqlConnection(this.DatabaseConnectionString);
             dbCon.Open();
 
+
             if (DeltasOnly)
             {
                 Query = string.Format("{0} WHERE {1} > '{2}'", this.Query, LastUpdatedFieldName,
                     LastUpdated.ToString("d"));
             }
-
-            SqlDataAdapter adapter = new SqlDataAdapter(this.Query, dbCon);
+            SqlCommand command = new SqlCommand(this.Query, dbCon);
+            command.CommandTimeout = 3000;
+            SqlDataAdapter adapter = new SqlDataAdapter(command);
             adapter.Fill(ds);
             dbCon.Close();
 
